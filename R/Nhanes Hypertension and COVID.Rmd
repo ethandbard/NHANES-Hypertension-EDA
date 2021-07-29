@@ -1,0 +1,1291 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+```{r}
+library(foreign)
+library(tidyverse)
+library(dplyr)
+library(gt)
+library(ggplot2)
+library(scales)
+library(viridis)
+library(hrbrthemes)
+library(ggrepel)
+library(stringr)
+library(svMisc)
+```
+
+
+2013-2014
+```{r}
+demo14 <- foreign::read.xport("2013-2014/DEMO_H.XPT")
+demo14 <- demo14[(c("SEQN", "RIAGENDR", "RIDAGEYR", "RIDRETH3"))]
+
+mcq14 <- foreign::read.xport("2013-2014/MCQ_H.XPT")
+mcq14 <- mcq14[(c("SEQN", "MCQ160C", "MCQ160D", "MCQ160E", "MCQ160F"))]
+
+bpq14 <- foreign::read.xport("2013-2014/BPQ_H.XPT")
+bpq14 <- bpq14[c("SEQN", "BPQ020", "BPQ050A", "BPQ080", "BPQ100D")]
+
+rxq14 <- foreign::read.xport("2013-2014/RXQ_RX_H.XPT")
+rxq14  <- rxq14[c("SEQN","RXDUSE","RXDDRUG","RXDRSC1","RXDRSC2", "RXDRSC3", "RXDRSD1", "RXDRSD2", "RXDRSD3")]
+rxq14 <- rxq14 %>% 
+  mutate(cycle = "2013-2014")
+
+hiq14 <- foreign::read.xport("2013-2014/HIQ_H.XPT")
+hiq14 <- hiq14[c("SEQN", "HIQ011", "HIQ270")]
+
+nhanes14 <- left_join(demo14, mcq14, by = "SEQN")
+nhanes14 <- left_join(nhanes14, bpq14, by = "SEQN")
+nhanes14 <- left_join(nhanes14, hiq14, by = "SEQN")
+#nhanes14 <- left_join(x = nhanes14, y = rxq14, by = "SEQN", copy = FALSE)
+```
+
+2015-2016
+```{r}
+demo16 <- foreign::read.xport("2015-2016/DEMO_I.XPT")
+demo16 <- demo16[(c("SEQN", "RIAGENDR", "RIDAGEYR", "RIDRETH3"))]
+
+mcq16 <- foreign::read.xport("2015-2016/MCQ_I.XPT")
+mcq16 <- mcq16[(c("SEQN", "MCQ160C", "MCQ160D", "MCQ160E", "MCQ160F"))]
+
+bpq16 <- foreign::read.xport("2015-2016/BPQ_I.XPT")
+bpq16 <- bpq16[c("SEQN", "BPQ020", "BPQ050A", "BPQ080", "BPQ100D")]
+
+rxq16 <- foreign::read.xport("2015-2016/RXQ_RX_I.XPT")
+rxq16 <- rxq16[c("SEQN","RXDUSE","RXDDRUG","RXDRSC1","RXDRSC2", "RXDRSC3", "RXDRSD1", "RXDRSD2", "RXDRSD3")]
+rxq16 <- rxq16 %>% 
+  mutate(cycle = "2015-2016")
+
+hiq16 <- foreign::read.xport("2015-2016/HIQ_I.XPT")
+hiq16 <- hiq16[c("SEQN", "HIQ011", "HIQ270")]
+
+nhanes16 <- left_join(demo16, mcq16, by = "SEQN")
+nhanes16 <- left_join(nhanes16, bpq16, by = "SEQN")
+nhanes16 <- left_join(nhanes16, hiq16, by = "SEQN")
+#nhanes16 <- left_join(x = nhanes16, y = rxq16, by = "SEQN", copy = FALSE)
+```
+
+2017-2018
+```{r}
+demo18 <- foreign::read.xport("2017-2018/DEMO_J.XPT")
+demo18 <- demo18[(c("SEQN", "RIAGENDR", "RIDAGEYR", "RIDRETH3"))]
+
+mcq18 <- foreign::read.xport("2017-2018/MCQ_J.XPT")
+mcq18 <- mcq18[(c("SEQN", "MCQ160C", "MCQ160D", "MCQ160E", "MCQ160F"))]
+
+bpq18 <- foreign::read.xport("2017-2018/BPQ_J.XPT")
+bpq18 <- bpq18[c("SEQN", "BPQ020", "BPQ050A", "BPQ080", "BPQ100D")]
+
+rxq18 <- foreign::read.xport("2017-2018/RXQ_RX_J.XPT")
+rxq18  <- rxq18[c("SEQN","RXDUSE","RXDDRUG","RXDRSC1","RXDRSC2", "RXDRSC3", "RXDRSD1", "RXDRSD2", "RXDRSD3")]
+rxq18 <- rxq18 %>% 
+  mutate(cycle = "2017-2018")
+
+hiq18 <- foreign::read.xport("2017-2018/HIQ_J.XPT")
+hiq18 <- hiq18[c("SEQN", "HIQ011", "HIQ270")]
+
+nhanes18 <- left_join(demo18, mcq18, by = "SEQN")
+nhanes18 <- left_join(nhanes18, bpq18, by = "SEQN")
+nhanes18 <- left_join(nhanes18, hiq18, by = "SEQN")
+#nhanes18 <- left_join(x = nhanes18, y = rxq18, by = "SEQN", copy = FALSE)
+```
+
+```{r}
+#merge dataset cycles
+nhanes <- rbind(nhanes14, nhanes16, nhanes18)
+rxq <- rbind(rxq14, rxq16, rxq18)
+```
+
+```{r}
+#For I10, max is 7.
+rxq %>% 
+  group_by(SEQN, RXDRSC1) %>% 
+  count() %>% 
+  arrange(desc(n))
+```
+
+
+```{r}
+#Create age group categories
+nhanes <- nhanes %>% 
+  mutate(age_group = case_when(
+    RIDAGEYR <= 20 ~ "20 and Under",
+    RIDAGEYR >= 21 & RIDAGEYR <= 59 ~ "20-59",
+    RIDAGEYR >= 60 ~ "60+"
+  ))
+
+nhanes <- nhanes %>% 
+  filter(age_group != "20 and Under")
+```
+
+
+```{r}
+#Hypertensive categories
+ACE <- c("BENAZEPRIL", "CAPTOPRIL", "ENALAPRIL", "FOSINOPRIL", "LISINOPRIL",
+        "MOEXIPRIL", "PERINDOPRIL", "QUINAPRIL", "RAMIPRIL", "TRANDOLAPRIL")
+
+CCB <- c("AMLODIPINE", "DILTIAZEM", "FELODIPINE", "ISRADIPINE", "NICARDIPINE",
+         "NIFEDIPINE", "NISOLDIPINE", "VERAPAMIL")
+
+ARB <- c("AZILSARTAN", "CANDESARTAN", "EPROSARTAN", "IRBESARTAN", "LOSARTAN", "OLMESARTAN", "TELMISARTAN", "VALSARTAN")
+
+BB <- c("ATENOLOL", "BISOPROLOL", "PROPRANOLOL", "CARVEDILOL", "ACEBUTOLOL", "BETAXOLOL", "CARTEOLOL", "LABETALOL", "METOPROLOL")
+
+AB <- c("ALFUZOSIN", "DOXAZOSIN", "SILODOSIN", "TAMSULOSIN", "TERAZOSIN")
+
+diuretic <- c("CHLOROTHALIDONE", "CHLOROTHIAZIDE", "HYDROCHLOROTHIAZIDE", "INDAPAMIDE", "METOLAZONE")
+```
+
+```{r}
+rxq <- rxq %>% 
+mutate(RXDDRUG1 = word(RXDDRUG, 1, sep = "; "))
+
+rxq <- rxq %>% 
+mutate(RXDDRUG2 = word(RXDDRUG, 2, sep = "; "))
+
+rxq %>% 
+  select(c(SEQN, RXDDRUG, RXDDRUG1, RXDDRUG2))
+```
+
+
+```{r}
+#Create categorical variable for hypertensive drugs
+rxq <- rxq %>% 
+  mutate(hypertensive_rx = case_when(
+    RXDDRUG1 %in% ACE ~ "ACE",
+    RXDDRUG1 %in% CCB ~ "CCB",
+    RXDDRUG1 %in% ARB ~ "ARB",
+    RXDDRUG1 %in% BB ~ "BB",
+    RXDDRUG1 %in% AB ~ "AB",
+    RXDDRUG1 %in% diuretic ~ "diuretic",
+    RXDDRUG1 == "" ~ "",
+    TRUE ~ "other"
+  ))
+
+rxq <- rxq %>% 
+  mutate(hypertensive_rx2 = case_when(
+    RXDDRUG2 %in% ACE ~ "ACE",
+    RXDDRUG2 %in% CCB ~ "CCB",
+    RXDDRUG2 %in% ARB ~ "ARB",
+    RXDDRUG2 %in% BB ~ "BB",
+    RXDDRUG1 %in% AB ~ "AB",
+    RXDDRUG2 %in% diuretic ~ "diuretic",
+    is.na(RXDDRUG2) ~ "",
+    TRUE ~ "other"
+  ))
+```
+
+```{r}
+rxq %>% 
+  filter(RXDRSC1 == "I10") %>% 
+  select(c(RXDDRUG1, RXDDRUG2, hypertensive_rx, hypertensive_rx2))
+```
+
+
+```{r}
+as.data.frame(table(rxq$RXDRSD1, rxq$RXDRSC1)) %>% 
+  arrange(-Freq) %>% 
+  head(15) %>% 
+  gt() %>% 
+  tab_header(
+    title = md("Top 15 ICD-10 2013-2018")) %>%  
+  cols_label(Var1 = "Description",
+             Var2 = "ICD-10",
+             Freq = "Count")
+```
+
+
+```{r}
+as.data.frame(table(rxq$hypertensive_rx[rxq$RXDRSC1 == "I10"])) %>% 
+  arrange(-Freq) %>% 
+  head(20) %>% 
+  gt() %>% 
+  tab_header(
+    title = md("Prevalence of Hypertensive Drug Categories 2013-2018")) %>%  
+  cols_label(Var1 = "Drug Category",
+             Freq = "Count")
+```
+
+```{r}
+#Join rxq and nhanes for demographic analysis
+df <- left_join(rxq, nhanes, by = "SEQN") %>% filter(age_group != "20 and Under")
+```
+
+```{r}
+#number of drugs prescribed per individual
+seqn_counts <- df %>% 
+  select(c(SEQN,RXDUSE)) %>% 
+  group_by(SEQN) %>% 
+  count()
+```
+
+```{r}
+#number of i10 drugs per individual
+num_i10 <- df %>% 
+  select(c(SEQN, RXDUSE, RXDRSC1)) %>% 
+  group_by(SEQN, RXDRSC1) %>% 
+  filter(RXDRSC1 == "I10") %>% 
+  count()
+```
+
+```{r}
+nhanes <- nhanes %>% 
+  mutate(num_rx = seqn_counts$n)
+```
+
+```{r, warning = FALSE}
+#total number of prescribed drugs per individual
+for (i in 1:dim(df)) {
+  seqn <- df$SEQN[i]
+  nhanes$RXDUSE_n[nhanes$SEQN == seqn] <- unique(df$RXDUSE[df$SEQN == seqn])
+}
+```
+
+```{r, warning = FALSE}
+for (i in 1:dim(nhanes)) {
+  seqn <- nhanes$SEQN[i]
+  if (seqn %in% num_i10$SEQN) {
+    nhanes$num_i10[nhanes$SEQN == seqn] <- num_i10$n[num_i10$SEQN == seqn]
+  }
+}
+```
+
+```{r}
+#Join rxq and nhanes for demographic analysis
+df <- left_join(rxq, nhanes, by = "SEQN") %>% filter(age_group != "20 and Under")
+```
+
+```{r, warning=FALSE}
+#Hypertension drug categories, individual level
+nhanes <- nhanes %>% 
+  mutate(ACE = 0) %>% 
+  mutate(CCB = 0) %>% 
+  mutate(BB = 0) %>% 
+  mutate(ARB = 0) %>% 
+  mutate(AB = 0) %>% 
+  mutate(other = 0) %>% 
+  mutate(diuretic = 0)
+
+#Count number of prescriptions per category, individual 
+# for (i in 1:dim(df)) {
+#   seqn = df$SEQN[i]
+#   if (df$hypertensive_rx[i] == "ACE" | df$hypertensive_rx2[i] == "ACE") {
+#     nhanes$ACE[nhanes$SEQN == seqn] <- nhanes$ACE[nhanes$SEQN == seqn] + 1
+#   }
+#   if (df$hypertensive_rx[i] == "CCB" | df$hypertensive_rx2[i] == "CCB") {
+#     nhanes$CCB[nhanes$SEQN == seqn] <- nhanes$CCB[nhanes$SEQN == seqn] + 1
+#   }
+#   if (df$hypertensive_rx[i] == "BB" | df$hypertensive_rx2[i] == "BB") {
+#     nhanes$BB[nhanes$SEQN == seqn] <- nhanes$BB[nhanes$SEQN == seqn] + 1
+#   }
+#   if (df$hypertensive_rx[i] == "ARB" | df$hypertensive_rx2[i] == "ARB") {
+#     nhanes$ARB[nhanes$SEQN == seqn] <- nhanes$ARB[nhanes$SEQN == seqn] + 1
+#   }
+#   if (df$hypertensive_rx[i] == "AB" | df$hypertensive_rx2[i] == "AB") {
+#     nhanes$AB[nhanes$SEQN == seqn] <- nhanes$ARB[nhanes$SEQN == seqn] + 1
+#   }  
+#   if (df$hypertensive_rx[i] == "other" | df$hypertensive_rx2[i] == "other") {
+#     nhanes$other[nhanes$SEQN == seqn] <- nhanes$other[nhanes$SEQN == seqn] + 1
+#   }
+#   if (df$hypertensive_rx[i] == "diuretic" | df$hypertensive_rx2[i] == "diuretic") {
+#     nhanes$diuretic[nhanes$SEQN == seqn] <- nhanes$diuretic[nhanes$SEQN == seqn] + 1
+#   }
+
+#Prescription Categories, factor, individual
+for (i in 1:dim(df)) {
+  seqn = df$SEQN[i]
+  
+  if (df$RXDRSC1[i] != "I10") {
+    next
+  }
+  
+  if (df$hypertensive_rx[i] == "ACE" | df$hypertensive_rx2[i] == "ACE") {
+    nhanes$ACE[nhanes$SEQN == seqn] <- 1
+  }
+  if (df$hypertensive_rx[i] == "CCB" | df$hypertensive_rx2[i] == "CCB") {
+    nhanes$CCB[nhanes$SEQN == seqn] <- 1
+  }
+  if (df$hypertensive_rx[i] == "BB" | df$hypertensive_rx2[i] == "BB") {
+    nhanes$BB[nhanes$SEQN == seqn] <-  1
+  }
+  if (df$hypertensive_rx[i] == "ARB" | df$hypertensive_rx2[i] == "ARB") {
+    nhanes$ARB[nhanes$SEQN == seqn] <-  1
+  }
+  if (df$hypertensive_rx[i] == "AB" | df$hypertensive_rx2[i] == "AB") {
+    nhanes$AB[nhanes$SEQN == seqn] <-  1
+  }  
+  if (df$hypertensive_rx[i] == "other" | df$hypertensive_rx2[i] == "other") {
+    nhanes$other[nhanes$SEQN == seqn] <-  1
+  }
+  if (df$hypertensive_rx[i] == "diuretic" | df$hypertensive_rx2[i] == "diuretic") {
+    nhanes$diuretic[nhanes$SEQN == seqn] <-  1
+  }
+}
+```
+
+
+
+```{r}
+unique(df$RIDRETH3)
+#code ethnicity variable
+df <- df %>% 
+  mutate(RIDRETH3 = case_when(
+    RIDRETH3 == 1 ~ "Mexican American",
+    RIDRETH3 == 2 ~ "Other Hispanic",
+    RIDRETH3 == 3 ~ "Non-Hispanic White",
+    RIDRETH3 == 4 ~ "Non-Hispanic Black",
+    RIDRETH3 == 6 ~ "Non-Hispanic Asian",
+    RIDRETH3 == 7 ~ "Other"
+  ))
+
+nhanes <- nhanes %>% 
+  mutate(RIDRETH3 = case_when(
+    RIDRETH3 == 1 ~ "Mexican American",
+    RIDRETH3 == 2 ~ "Other Hispanic",
+    RIDRETH3 == 3 ~ "Non-Hispanic White",
+    RIDRETH3 == 4 ~ "Non-Hispanic Black",
+    RIDRETH3 == 6 ~ "Non-Hispanic Asian",
+    RIDRETH3 == 7 ~ "Other"
+  ))
+
+#reduce df to only white and black
+df <- df %>% 
+  filter(RIDRETH3 == "Non-Hispanic White" | RIDRETH3 == "Non-Hispanic Black")
+```
+```{r}
+df %>% 
+  group_by(RIDRETH3) %>% 
+  count()
+```
+
+```{r}
+#Create dataframes by race
+df_white <- df %>% filter(RIDRETH3 == "Non-Hispanic White")
+df_black <- df %>% filter(RIDRETH3 == "Non-Hispanic Black")
+```
+
+```{r}
+df_white %>% 
+  filter(RXDRSC1 == "I10") %>% 
+  count()
+```
+
+
+```{r}
+#White hypertension
+as.data.frame(table(df_white$age_group[df_white$RXDRSC1 == "I10"], df_white$hypertensive_rx[df_white$RXDRSC1 == "I10"])) %>% mutate(percent = percent(Freq / 2718)) %>% 
+  arrange(-Freq) %>% 
+  gt() %>% 
+  tab_header(
+    title = md("Hypertensive Drug Prevalence Non-Hispanic White 2013-2018"),
+    subtitle = md("N = 2718")) %>%  
+  cols_label(Var1 = "Age Group",
+             Var2 = "Drug",
+             Freq = "Count")
+```
+
+```{r}
+df_black %>% 
+  filter(RXDRSC1 == "I10") %>% 
+  count()
+```
+
+
+```{r}
+#Black hypertension
+as.data.frame(table(df_black$age_group[df_black$RXDRSC1 == "I10"], df_black$hypertensive_rx[df_black$RXDRSC1 == "I10"])) %>% mutate(percent = percent(Freq / 2230)) %>% 
+  arrange(-Freq) %>% 
+  gt() %>% 
+  tab_header(
+    title = md("Hypertensive Drug Prevalence Non-Hispanic Black 2013-2018"),
+    subtitle = md("N = 2230")) %>%  
+  cols_label(Var1 = "Age Group",
+             Var2 = "Drug",
+             Freq = "Count")
+```
+
+
+```{r}
+df_white %>% 
+  filter(RXDRSC1 == "I10") %>% 
+  count()
+```
+
+
+```{r}
+#Drug Prevalence by Age, white
+myDf <- as.data.frame(table(df_white$age_group[df_white$RXDRSC1 == "I10"], df_white$hypertensive_rx[df_white$RXDRSC1 == "I10"])) %>% 
+  arrange(-Freq)
+
+ggplot(myDf, aes(fill = Var2, y = Freq, x = reorder(Var2, desc(Freq)))) +
+  geom_bar(stat = "identity", width = 0.5, colour = "black") +
+  scale_fill_viridis(discrete = T, option = "E") +
+  ggtitle("Hypertensive Drug Prevalence by Age Group, Non-Hispanic White 2013-2018") + 
+  facet_wrap(~Var1) + 
+  theme_minimal() +
+  theme(legend.position = "none") + 
+  xlab("") +
+  ylab("Count") +
+  theme(plot.title = element_text(hjust = 0.5), axis.text.x = element_text(angle = 45, vjust = 0.5, hjust = 0.5)) +
+  geom_text(aes(label = percent(round(Freq/2718, 3))), position = position_stack(vjust=0.5)) +
+  scale_fill_brewer(palette = "Pastel1")
+```
+
+```{r}
+df_white %>% 
+  filter(RXDRSC1 == "I10") %>% 
+  count()
+```
+
+```{r}
+#Drug Prevalence by Age, black
+myDf <- as.data.frame(table(df_black$age_group[df_black$RXDRSC1 == "I10"], df_black$hypertensive_rx[df_black$RXDRSC1 == "I10"])) %>% 
+  arrange(-Freq)
+
+ggplot(myDf, aes(fill = Var2, y = Freq, x = reorder(Var2, -Freq))) +
+  geom_bar(stat = "identity", width = 0.5, colour = "black") +
+  scale_fill_viridis(discrete = T, option = "E") +
+  ggtitle("Hypertensive Drug Prevalence by Age Group, Non-Hispanic Black 2013-2018") + 
+  facet_wrap(~Var1) + 
+  theme_minimal() +
+  theme(legend.position = "none") + 
+  xlab("") +
+  ylab("Count") +
+  theme(plot.title = element_text(hjust = 0.5), axis.text.x = element_text(angle = 45, vjust = 0.5, hjust = 0.5)) +
+  geom_text(aes(label = percent(round(Freq/2230, 3))), position = position_stack(vjust=0.5)) +
+  scale_fill_brewer(palette = "Pastel1")
+```
+
+
+HYPERTENSION
+```{r}
+#people who have been told they had hypertension, bpq020 = 1
+bp <- nhanes %>% 
+  filter(BPQ020 == 1) %>% 
+  mutate(BPQ050A = case_when(
+    BPQ050A == 1 ~ "Yes",
+    BPQ050A == 2 ~ "No",
+    BPQ050A == 7 ~ "Refused",
+    BPQ050A == 9 ~ "Don't Know"
+  ))
+
+bp_white <- bp %>% 
+  filter(RIDRETH3 == "Non-Hispanic White")
+
+bp_black <- bp %>% 
+  filter(RIDRETH3 == "Non-Hispanic Black")
+```
+
+```{r}
+bp_white %>% 
+  count(BPQ050A) %>% 
+  mutate(perc = n / nrow(bp_white)) -> bp2
+
+ggplot(bp2, aes(x = reorder(as.factor(BPQ050A), -perc), y = perc, fill = as.factor(BPQ050A))) + 
+  geom_bar(stat = "identity", show.legend = FALSE, colour = "Black") + 
+  labs(x = "Taking Rx for Hypertension? (BPQ050A)",y = "Percent", title = "Non-Hispanic White Participants With Hypertension") +
+  geom_text(aes(label = percent(perc)), position = position_stack(vjust=0.5)) +
+  theme_classic() + 
+  theme(plot.title = element_text(hjust = 0.5)) +
+  scale_fill_brewer(palette = "Pastel1")
+```
+
+```{r}
+bp_white %>% 
+  count(RXDUSE_n) %>% 
+  mutate(perc = n / nrow(bp_white)) -> bp2
+
+ggplot(bp2, aes(x = as.factor(RXDUSE_n), y = perc, fill = as.factor(RXDUSE_n))) + 
+  geom_bar(stat = "identity", show.legend = FALSE, colour = "Black") + 
+  labs(x = "Taking Rx? (RXDUSE)",y = "Percent", title = "Non-Hispanic White Participants With Hypertension") +
+  geom_text(aes(label = percent(perc)), position = position_stack(vjust=0.5)) +
+  theme_classic() + 
+  theme(plot.title = element_text(hjust = 0.5)) +
+  scale_fill_brewer(palette = "Pastel1")
+```
+
+
+```{r}
+bp_black %>% 
+  count(BPQ050A) %>% 
+  mutate(perc = n / nrow(bp_black)) -> bp2
+
+ggplot(bp2, aes(x = reorder(as.factor(BPQ050A), -perc), y = perc, fill = as.factor(BPQ050A))) + 
+  geom_bar(stat = "identity", show.legend = FALSE, colour = "Black") + 
+  labs(x = "Taking Rx for Hypertension (BPQ050A)?",y = "Percent", title = "Non-Hispanic Black Participants With Hypertension") +
+  geom_text(aes(label = percent(perc)), position = position_stack(vjust=0.5)) +
+  theme_classic() + 
+  theme(plot.title = element_text(hjust = 0.5)) +
+  scale_fill_brewer(palette = "Pastel1")
+```
+
+```{r}
+bp_black %>% 
+  count(RXDUSE_n) %>% 
+  mutate(perc = n / nrow(bp_black)) -> bp2
+
+ggplot(bp2, aes(x = as.factor(RXDUSE_n), y = perc, fill = as.factor(RXDUSE_n))) + 
+  geom_bar(stat = "identity", show.legend = FALSE, colour = "Black") + 
+  labs(x = "Taking Rx? (RXDUSE)",y = "Percent", title = "Non-Hispanic Black Participants With Hypertension") +
+  geom_text(aes(label = percent(perc)), position = position_stack(vjust=0.5)) +
+  theme_classic() + 
+  theme(plot.title = element_text(hjust = 0.5)) +
+  scale_fill_brewer(palette = "Pastel1")
+```
+
+
+```{r}
+#white participants with hypertension, prevalence of drug type 
+bp <- df_white %>% filter(BPQ020 == 1 & BPQ050A == 1  & RXDUSE == 1 & RXDRSC1 == "I10")
+
+bp %>% 
+  count(hypertensive_rx) %>% 
+  mutate(perc = n / nrow(bp)) -> bp2 
+
+bp2 <- bp2 %>% 
+  arrange(desc(n)) %>% 
+  head(10)
+
+ggplot(bp2, aes(x = as.factor(reorder(hypertensive_rx, -perc)), y = perc, fill = as.factor(hypertensive_rx))) + 
+  geom_bar(stat = "identity", show.legend = FALSE, colour = "Black") + 
+  labs(x = "Drug Prescribed",y = "Percent", title = "White Participants With Hypertension") +
+  geom_text(aes(label = percent(perc)), position = position_stack(vjust=0.5)) +
+  theme_classic() + 
+  theme(plot.title = element_text(hjust = 0.5), axis.text.x = element_text(angle = 45, vjust = 0.5, hjust = 0.5)) +
+  scale_fill_brewer(palette = "Pastel1")
+```
+```{r}
+#black participants with hypertension, prevalence of drug type 
+bp <- df_black %>% filter(BPQ020 == 1 & BPQ050A == 1  & RXDUSE == 1 & RXDRSC1 == "I10")
+
+bp %>% 
+  count(hypertensive_rx) %>% 
+  mutate(perc = n / nrow(bp)) -> bp2 
+
+bp2 <- bp2 %>% 
+  arrange(desc(n)) %>% 
+  head(10)
+
+ggplot(bp2, aes(x = as.factor(reorder(hypertensive_rx, -perc)), y = perc, fill = as.factor(hypertensive_rx))) + 
+  geom_bar(stat = "identity", show.legend = FALSE, colour = "Black") + 
+  labs(x = "Drug Prescribed",y = "Percent", title = "Black Participants With Hypertension") +
+  geom_text(aes(label = percent(perc)), position = position_stack(vjust=0.5)) +
+  theme_classic() + 
+  theme(plot.title = element_text(hjust = 0.5), axis.text.x = element_text(angle = 45, vjust = 0.5, hjust = 0.5)) +
+  scale_fill_brewer(palette = "Pastel1")
+```
+
+
+
+```{r}
+bp <- df_white %>% filter(BPQ020 == 1 & BPQ050A == 1  & RXDUSE == 1 & RXDRSC1 == "I10")
+
+bp2 <- as.data.frame(table(bp$RXDDRUG, bp$hypertensive_rx)) %>% arrange(-Freq) %>% head(9)
+#bp2 <- bp2 %>% mutate(perc = percent(Freq / sum(Freq))) %>% head(9)
+
+ggplot(bp2, aes(x = as.factor(reorder(Var1,-Freq)), y = as.numeric(Freq), fill = Var2)) + 
+  geom_bar(stat = "identity", show.legend = TRUE, colour = "Black") + 
+  labs(x = "Drug Prescribed",y = "Count", title = "Prescriptions for White Participants With Hypertension", fill = "Cateogory") +
+  geom_text(aes(label = percent(Freq / nrow(bp))), position = position_stack(vjust=0.5)) +
+  theme_classic() + 
+  theme(plot.title = element_text(hjust = 0.5), axis.text.x = element_text(angle = 45, vjust = 0.5, hjust = 0.5)) +
+  scale_fill_brewer(palette = "Pastel1")
+```
+
+```{r}
+bp <- df_black%>% filter(BPQ020 == 1 & BPQ050A == 1  & RXDUSE == 1 & RXDRSC1 == "I10")
+
+bp2 <- as.data.frame(table(bp$RXDDRUG, bp$hypertensive_rx)) %>% arrange(-Freq) %>% head(9)
+#bp2 <- bp2 %>% mutate(perc = percent(Freq / sum(Freq))) %>% head(9)
+
+ggplot(bp2, aes(x = as.factor(reorder(Var1,-Freq)), y = as.numeric(Freq), fill = Var2)) + 
+  geom_bar(stat = "identity", show.legend = TRUE, colour = "Black") + 
+  labs(x = "Drug Prescribed",y = "Count", title = "Prescriptions for Black Participants With Hypertension", fill = "Category") +
+  geom_text(aes(label = percent(Freq / nrow(bp))), position = position_stack(vjust=0.5)) +
+  theme_classic() + 
+  theme(plot.title = element_text(hjust = 0.5), axis.text.x = element_text(angle = 45, vjust = 0.5, hjust = 0.5)) +
+  scale_fill_brewer(palette = "Pastel1")
+```
+
+```{r}
+df %>% 
+  select(c(SEQN, RXDRSC1, num_i10)) %>% 
+  filter(RXDRSC1 == "I10")
+```
+
+
+```{r}
+nhanes %>% 
+  filter(RXDUSE_n == 1 & RIDRETH3 == "Non-Hispanic White" & num_i10 >= 1) %>% count()
+```
+
+
+```{r}
+as.data.frame(table(nhanes$RIDRETH3[nhanes$RXDUSE_n == 1 & nhanes$num_i10 >= 1], nhanes$num_i10[nhanes$RXDUSE_n == 1 & nhanes$num_i10 >= 1])) %>% mutate(perc = percent(Freq / 1827)) %>%
+  filter(Var1 == "Non-Hispanic White") %>% 
+  arrange(-Freq) %>% 
+  gt() %>% 
+    tab_header(
+     title = md("Number of I10 Prescriptions per Individual, Non-Hispanic White, 2013-2018"),
+     subtitle = md("N = 1827")) %>% 
+    cols_label(
+      Var1 = "Ethnic Group",
+      Var2 = "Number of Prescriptions"
+    )
+```
+
+
+```{r}
+myDf <- as.data.frame(table(nhanes$RIDRETH3[nhanes$RXDUSE == 1], nhanes$num_i10[nhanes$RXDUSE == 1])) %>% 
+  filter(Var1 == "Non-Hispanic White") %>% 
+  arrange(-Freq)
+
+ggplot(myDf, aes(fill = Var2, x = reorder(Var2, -Freq), y = Freq, label = percent(Freq / 1827))) +
+  geom_bar(stat = "identity", width = 0.5, colour = "black") +
+  ggtitle("Number of I10 Prescriptions per Individual, Non-Hispanic White, 2013-2018") +
+  theme_minimal() +
+  theme(legend.position = "none") +
+  xlab("Number of I10 Drugs Prescribed") +
+  ylab("Count (Individuals)") +
+  geom_text(aes(label = percent(Freq / 1827)), position = position_stack(vjust=0.5)) +
+  scale_fill_brewer(palette = "Pastel1")
+```
+
+```{r}
+nhanes %>% 
+  filter(RXDUSE_n == 1 & RIDRETH3 == "Non-Hispanic Black" & num_i10 >= 1) %>% count()
+```
+
+
+```{r}
+as.data.frame(table(nhanes$RIDRETH3[nhanes$RXDUSE_n == 1 & nhanes$num_i10 >= 1], nhanes$num_i10[nhanes$RXDUSE_n == 1 & nhanes$num_i10 >= 1])) %>% mutate(perc = percent(Freq / 1348)) %>%
+  filter(Var1 == "Non-Hispanic Black") %>% 
+  arrange(-Freq) %>% 
+  gt() %>% 
+    tab_header(
+     title = md("Number of I10 Prescriptions per Individual, Non-Hispanic Black, 2013-2018"),
+     subtitle = md("N = 1348")) %>% 
+    cols_label(
+      Var1 = "Ethnic Group",
+      Var2 = "Number of Prescriptions"
+    )  
+```
+
+
+```{r}
+myDf <- as.data.frame(table(nhanes$RIDRETH3[nhanes$RXDUSE == 1], nhanes$num_i10[nhanes$RXDUSE == 1])) %>% 
+  filter(Var1 == "Non-Hispanic Black") %>% 
+  arrange(-Freq)
+
+ggplot(myDf, aes(fill = Var2, x = reorder(Var2, -Freq), y = Freq, label = percent(Freq / 1348))) +
+  geom_bar(stat = "identity", width = 0.5, colour = "black") +
+  ggtitle("Number of I10 Prescriptions per Individual, Non-Hispanic Black, 2013-2018") +
+  theme_minimal() +
+  theme(legend.position = "none") +
+  xlab("Number of I10 Drugs Prescribed") +
+  ylab("Count (Individuals)") +
+  geom_text(aes(label = percent(Freq / 1348)), position = position_stack(vjust=0.5)) +
+  scale_fill_brewer(palette = "Pastel1")
+```
+
+```{r}
+#is race a factor in how patients are treated?
+Categories <- c("ACE", "AB", "ARB", "BB", "CCB", "diuretic")
+means <- c(mean(bp_white$ACE), mean(bp_white$AB), mean(bp_white$ARB), mean(bp_white$BB), mean(bp_white$CCB), mean(bp_white$diuretic))
+
+df <- data.frame(Categories, means)
+df %>% 
+  ggplot(aes(x = reorder(Categories, -means), y = means, label = means, fill = Categories)) +
+  geom_bar(stat = "identity", width = 0.5, colour = "black") +
+  ggtitle("Average Number of I10 Categories Per Individual, Non-Hispanic White, 2013-2018") +
+  theme_minimal() +
+  theme(legend.position = "none") +
+  xlab("Number of I10 Drugs Prescribed") +
+  ylab("Count (Individuals)") +
+  geom_text(aes(label = round(means,2)), position = position_stack(vjust=0.5)) +
+  scale_fill_brewer(palette = "Pastel1")
+
+```
+
+```{r}
+#is race a factor in how patients are treated?
+Categories <- c("ACE", "AB", "ARB", "BB", "CCB", "diuretic")
+means <- c(mean(bp_black$ACE), mean(bp_black$AB), mean(bp_black$ARB), mean(bp_black$BB), mean(bp_black$CCB), mean(bp_black$diuretic))
+
+df <- data.frame(Categories, means)
+df %>% 
+  ggplot(aes(x = reorder(Categories, -means), y = means, label = means, fill = Categories)) +
+  geom_bar(stat = "identity", width = 0.5, colour = "black") +
+  ggtitle("Average Number of I10 Categories Per Individual, Non-Hispanic Black, 2013-2018") +
+  theme_minimal() +
+  theme(legend.position = "none") +
+  xlab("Number of I10 Drugs Prescribed") +
+  ylab("Count (Individuals)") +
+  geom_text(aes(label = round(means,2)), position = position_stack(vjust=0.5)) +
+  scale_fill_brewer(palette = "Pastel1")
+
+```
+
+```{r}
+as.data.frame(table(bp_white$ACE, bp_white$BB, bp_white$CCB, bp_white$ARB, bp_white$AB, bp_white$diuretic, bp_white$other)) %>% 
+  arrange(-Freq) %>% 
+  mutate(perc = percent(Freq / nrow(bp_white))) %>% 
+  gt() %>% 
+  tab_header(
+    title = "Most Common Combinations of Drug Categories, Non-Hispanic White"
+  ) %>% 
+  cols_label(
+    Var1 = "ACE",
+    Var2 = "BB",
+    Var3 = "CCB",
+    Var4 = "ARB",
+    Var5 = "AB",
+    Var6 = "diuretic",
+    Var7 = "other"
+  )
+```
+```{r}
+as.data.frame(table(bp_black$ACE, bp_black$BB, bp_black$CCB, bp_black$ARB, bp_black$AB, bp_black$diuretic, bp_black$other)) %>% 
+  arrange(-Freq) %>% 
+  mutate(perc = percent(Freq / nrow(bp_black))) %>% 
+  gt() %>% 
+  tab_header(
+    title = "Most Common Combinations of Drug Categories, Non-Hispanic Black"
+  ) %>% 
+  cols_label(
+    Var1 = "ACE",
+    Var2 = "BB",
+    Var3 = "CCB",
+    Var4 = "ARB",
+    Var5 = "AB",
+    Var6 = "diuretic",
+    Var7 = "other"
+  )
+```
+
+```{r}
+bp <- nhanes %>% 
+  filter(BPQ020 == 1)
+
+bp_white <- bp %>% 
+  filter(RIDRETH3 == "Non-Hispanic White")
+
+bp_black <- bp %>% 
+  filter(RIDRETH3 == "Non-Hispanic Black")
+```
+
+
+# Health Insurance
+```{r}
+#FOR THOSE WITH HYPERTENSION:
+
+#By race, how many people are covered by health insurance?
+as.data.frame(table(bp_white$HIQ011, bp_white$HIQ270)) %>% 
+  arrange(-Freq) %>% 
+  mutate(perc = paste0((round(Freq / nrow(bp_white) * 100, 2)),"%")) %>% 
+  filter(Var1 %in% c(1,2), Var2 %in% c(1,2)) %>% 
+  gt() %>% 
+  tab_header(title = md("Health Insurance and Prescription Coverage, White w/ hypertension")) %>% 
+  cols_label(Var1 = "Covered By Health Insurance",
+             Var2 = "Insurance Helps Pay for Rx")
+```
+
+```{r}
+#By race, how many people are covered by health insurance?
+as.data.frame(table(bp_black$HIQ011, bp_black$HIQ270)) %>% 
+  arrange(-Freq) %>% 
+  mutate(perc = paste0((round(Freq / nrow(bp_black) * 100, 2)),"%")) %>% 
+  filter(Var1 %in% c(1,2), Var2 %in% c(1,2)) %>% 
+  gt() %>% 
+  tab_header(title = md("Health Insurance and Prescription Coverage, Black w/ hypertension")) %>% 
+  cols_label(Var1 = "Covered By Health Insurance",
+             Var2 = "Insurance Helps Pay for Rx")
+```
+```{r}
+#Drug Prevalence by HIQ, white
+myDf <- as.data.frame(table(df_white$HIQ011[df_white$RXDRSC1 == "I10"], df_white$hypertensive_rx[df_white$RXDRSC1 == "I10"])) %>% 
+  arrange(-Freq) %>% 
+  filter(Var1 %in% c(1,2)) %>% 
+  mutate(Var1 = case_when(
+    Var1 == 1 ~ "Insured",
+    Var1  == 2 ~ "Uninsured"
+  ))
+
+ggplot(myDf, aes(fill = Var2, y = Freq, x = reorder(Var2, -Freq))) +
+  geom_bar(stat = "identity", width = 0.5, colour = "black") +
+  scale_fill_viridis(discrete = T, option = "E") +
+  ggtitle("Hypertensive Drug Prevalence by Insurance Status, Non-Hispanic White 2013-2018") + 
+  facet_wrap(~Var1) + 
+  theme_minimal() +
+  theme(legend.position = "none") + 
+  xlab("") +
+  ylab("Count") +
+  theme(plot.title = element_text(hjust = 0.5), axis.text.x = element_text(angle = 45, vjust = 0.5, hjust = 0.5)) +
+  geom_text(aes(label = Freq,), position = position_stack(vjust=0.5)) + 
+  #geom_text(aes(label = percent(round(Freq/nrow(myDf), 3))), position = position_stack(vjust=0.5)) +
+  scale_fill_brewer(palette = "Pastel1")
+```
+
+```{r}
+#Drug Prevalence by HIQ, black
+myDf <- as.data.frame(table(df_black$HIQ011[df_black$RXDRSC1 == "I10"], df_black$hypertensive_rx[df_black$RXDRSC1 == "I10"])) %>% 
+  arrange(-Freq) %>% 
+  filter(Var1 %in% c(1,2)) %>% 
+  mutate(Var1 = case_when(
+    Var1 == 1 ~ "Insured",
+    Var1 == 2 ~ "Uninsured"
+  ))
+
+ggplot(myDf, aes(fill = Var2, y = Freq, x = reorder(Var2, -Freq))) +
+  geom_bar(stat = "identity", width = 0.5, colour = "black") +
+  scale_fill_viridis(discrete = T, option = "E") +
+  ggtitle("Hypertensive Drug Prevalence by Insurance Status, Non-Hispanic Black 2013-2018") + 
+  facet_wrap(~Var1) + 
+  theme_minimal() +
+  theme(legend.position = "none") + 
+  xlab("") +
+  ylab("Count") +
+  theme(plot.title = element_text(hjust = 0.5), axis.text.x = element_text(angle = 45, vjust = 0.5, hjust = 0.5)) +
+  geom_text(aes(label = Freq,), position = position_stack(vjust=0.5)) + 
+  #geom_text(aes(label = percent(round(Freq/nrow(myDf), 3))), position = position_stack(vjust=0.5)) +
+  scale_fill_brewer(palette = "Pastel1")
+```
+
+```{r}
+#Are people with hypertension taking any prescription? insured vs uninsured
+as.data.frame(table(bp_white$HIQ011, bp_white$RXDUSE_n)) %>% 
+  arrange(-Freq) %>% 
+  filter(Var1 %in% c(1,2), Var2 %in% c(1,2)) %>% 
+  mutate(perc = paste0(round(Freq / nrow(bp_white) * 100, 2),"%")) %>% 
+    mutate(Var1 = case_when(
+    Var1 == 1 ~ "Yes",
+    Var1 == 2 ~ "No",
+  )) %>% 
+  mutate(Var2 = case_when(
+    Var2 == 1 ~ "Yes",
+    Var2 == 2 ~ "No"
+  )) %>% 
+  gt() %>% 
+  tab_header(title = md("Are people with hypertension currently using RX? Insured vs Uninsured, Non-Hispanic White")) %>% 
+  cols_label(Var1 = "Insured?",
+             Var2 = "Taking RX")
+```
+```{r}
+#Are people with hypertension taking any prescription? insured vs uninsured
+as.data.frame(table(bp_black$HIQ011, bp_black$RXDUSE_n)) %>% 
+  arrange(-Freq) %>% 
+  filter(Var1 %in% c(1,2), Var2 %in% c(1,2)) %>% 
+  mutate(perc = paste0(round(Freq / nrow(bp_black) * 100, 2),"%")) %>%   
+  mutate(Var1 = case_when(
+    Var1 == 1 ~ "Yes",
+    Var1 == 2 ~ "No",
+  )) %>% 
+  mutate(Var2 = case_when(
+    Var2 == 1 ~ "Yes",
+    Var2 == 2 ~ "No"
+  )) %>% 
+  gt() %>% 
+  tab_header(title = md("Are people with hypertension currently using RX? Insured vs Uninsured, Non-Hispanic Black")) %>% 
+  cols_label(Var1 = "Insured?",
+             Var2 = "Taking RX")
+```
+
+MCQ160C - Coronary heart disease
+MCQ160D - Angina / Angina Pectoris
+MCQ160E - Had a heart attack
+MCQ160F - Had a stroke
+
+```{r}
+coronary <- nhanes %>% filter(MCQ160C == 1)
+coronary_white <- coronary %>% filter(RIDRETH3 == "Non-Hispanic White")
+coronary_black <- coronary %>% filter(RIDRETH3 == "Non-Hispanic Black")
+
+angina <- nhanes %>% filter(MCQ160D == 1)
+angina_white <- angina %>% filter(RIDRETH3 == "Non-Hispanic White")
+angina_black <- angina %>% filter(RIDRETH3 == "Non-Hispanic Black")
+
+heart <- nhanes %>% filter(MCQ160E == 1)
+heart_white <- heart %>% filter(RIDRETH3 == "Non-Hispanic White")
+heart_black <- heart %>% filter(RIDRETH3 == "Non-Hispanic Black")
+
+stroke <- nhanes %>% filter(MCQ160F == 1)
+stroke_white <- stroke %>% filter(RIDRETH3 == "Non-Hispanic White")
+stroke_black <- stroke %>% filter(RIDRETH3 == "Non-Hispanic Black")
+```
+
+```{r}
+#Are people taking any prescription? insured vs uninsured
+
+# HIQ, white
+myDf <- as.data.frame(table(bp_white$HIQ011, bp_white$RXDUSE_n)) %>% 
+  arrange(-Freq) %>% 
+  filter(Var1 %in% c(1,2)) %>% 
+  mutate(Var1 = case_when(
+    Var1 == 1 ~ "Insured",
+    Var1 == 2 ~ "Uninsured"
+  )) %>% 
+  mutate(Var2 = case_when(
+    Var2 == 1 ~ "Yes",
+    Var2 == 2 ~ "No"
+  )) 
+
+ggplot(myDf, aes(fill = Var2, y = Freq, x = reorder(Var2, -Freq))) +
+  geom_bar(stat = "identity", width = 0.5, colour = "black") +
+  scale_fill_viridis(discrete = T, option = "E") +
+  ggtitle(label = "Non-Hispanic White Participants with Hypertension") + 
+  facet_wrap(~Var1) + 
+  theme_minimal() +
+  theme(legend.position = "none",
+        plot.subtitle = element_text(hjust = 0.5)) + 
+  xlab("Currently Taking RX") +
+  ylab("Count") +
+  theme(plot.title = element_text(hjust = 0.5), axis.text.x = element_text(angle = 45, vjust = 0.5, hjust = 0.5)) +
+  geom_text(aes(label = Freq,), position = position_stack(vjust=0.5)) + 
+#  geom_text(aes(label = percent(round(Freq/nrow(myDf), 3))), position = position_stack(vjust=0.5)) +
+  scale_fill_brewer(palette = "Pastel1")
+```
+
+```{r}
+#Are people taking any prescription? insured vs uninsured
+
+# HIQ
+myDf <- as.data.frame(table(bp_black$HIQ011, bp_black$RXDUSE_n)) %>% 
+  arrange(-Freq) %>% 
+  filter(Var1 %in% c(1,2)) %>% 
+  mutate(Var1 = case_when(
+    Var1 == 1 ~ "Insured",
+    Var1 == 2 ~ "Uninsured"
+  )) %>% 
+  mutate(Var2 = case_when(
+    Var2 == 1 ~ "Yes",
+    Var2 == 2 ~ "No"
+  )) 
+
+ggplot(myDf, aes(fill = Var2, y = Freq, x = reorder(Var2, -Freq))) +
+  geom_bar(stat = "identity", width = 0.5, colour = "black") +
+  scale_fill_viridis(discrete = T, option = "E") +
+  ggtitle(label = "Non-Hispanic Black Participants with Hypertension") + 
+  facet_wrap(~Var1) + 
+  theme_minimal() +
+  theme(legend.position = "none",
+        plot.subtitle = element_text(hjust = 0.5)) + 
+  xlab("Currently Taking RX") +
+  ylab("Count") +
+  theme(plot.title = element_text(hjust = 0.5), axis.text.x = element_text(angle = 45, vjust = 0.5, hjust = 0.5)) +
+  geom_text(aes(label = Freq,), position = position_stack(vjust=0.5)) + 
+#  geom_text(aes(label = percent(round(Freq/nrow(myDf), 3))), position = position_stack(vjust=0.5)) +
+  scale_fill_brewer(palette = "Pastel1")
+```
+
+```{r}
+#Are people taking any prescription? insured vs uninsured
+myDf <- as.data.frame(table(coronary_white$HIQ011, coronary_white$RXDUSE_n)) %>% 
+  arrange(-Freq) %>% 
+  filter(Var1 %in% c(1,2)) %>% 
+  mutate(Var1 = case_when(
+    Var1 == 1 ~ "Insured",
+    Var1 == 2 ~ "Uninsured"
+  )) %>% 
+  mutate(Var2 = case_when(
+    Var2 == 1 ~ "Yes",
+    Var2 == 2 ~ "No"
+  )) 
+
+ggplot(myDf, aes(fill = Var2, y = Freq, x = reorder(Var2, -Freq))) +
+  geom_bar(stat = "identity", width = 0.5, colour = "black") +
+  scale_fill_viridis(discrete = T, option = "E") +
+  ggtitle(label = "Non-Hispanic White Participants with Coronary Heart Disease") + 
+  facet_wrap(~Var1) + 
+  theme_minimal() +
+  theme(legend.position = "none",
+        plot.subtitle = element_text(hjust = 0.5)) + 
+  xlab("Currently Taking RX") +
+  ylab("Count") +
+  theme(plot.title = element_text(hjust = 0.5), axis.text.x = element_text(angle = 45, vjust = 0.5, hjust = 0.5)) +
+  geom_text(aes(label = Freq,), position = position_stack(vjust=0.5)) + 
+#  geom_text(aes(label = percent(round(Freq/nrow(myDf), 3))), position = position_stack(vjust=0.5)) +
+  scale_fill_brewer(palette = "Pastel1")
+```
+
+```{r}
+#Are people taking any prescription? insured vs uninsured
+myDf <- as.data.frame(table(coronary_black$HIQ011, coronary_black$RXDUSE_n)) %>% 
+  arrange(-Freq) %>% 
+  filter(Var1 %in% c(1,2)) %>% 
+  mutate(Var1 = case_when(
+    Var1 == 1 ~ "Insured",
+    Var1 == 2 ~ "Uninsured"
+  )) %>% 
+  mutate(Var2 = case_when(
+    Var2 == 1 ~ "Yes",
+    Var2 == 2 ~ "No"
+  )) 
+
+ggplot(myDf, aes(fill = Var2, y = Freq, x = reorder(Var2, -Freq))) +
+  geom_bar(stat = "identity", width = 0.5, colour = "black") +
+  scale_fill_viridis(discrete = T, option = "E") +
+  ggtitle(label = "Non-Hispanic Black Participants with Coronary Heart Disease") + 
+  facet_wrap(~Var1) + 
+  theme_minimal() +
+  theme(legend.position = "none",
+        plot.subtitle = element_text(hjust = 0.5)) + 
+  xlab("Currently Taking RX") +
+  ylab("Count") +
+  theme(plot.title = element_text(hjust = 0.5), axis.text.x = element_text(angle = 45, vjust = 0.5, hjust = 0.5)) +
+  geom_text(aes(label = Freq,), position = position_stack(vjust=0.5)) + 
+#  geom_text(aes(label = percent(round(Freq/nrow(myDf), 3))), position = position_stack(vjust=0.5)) +
+  scale_fill_brewer(palette = "Pastel1")
+```
+
+```{r}
+#Are people taking any prescription? insured vs uninsured
+myDf <- as.data.frame(table(angina_white$HIQ011, angina_white$RXDUSE_n)) %>% 
+  arrange(-Freq) %>% 
+  filter(Var1 %in% c(1,2)) %>% 
+  mutate(Var1 = case_when(
+    Var1 == 1 ~ "Insured",
+    Var1 == 2 ~ "Uninsured"
+  )) %>% 
+  mutate(Var2 = case_when(
+    Var2 == 1 ~ "Yes",
+    Var2 == 2 ~ "No"
+  )) 
+
+ggplot(myDf, aes(fill = Var2, y = Freq, x = reorder(Var2, -Freq))) +
+  geom_bar(stat = "identity", width = 0.5, colour = "black") +
+  scale_fill_viridis(discrete = T, option = "E") +
+  ggtitle(label = "Non-Hispanic White Participants with Angina / Angina Pectoris") + 
+  facet_wrap(~Var1) + 
+  theme_minimal() +
+  theme(legend.position = "none",
+        plot.subtitle = element_text(hjust = 0.5)) + 
+  xlab("Currently Taking RX") +
+  ylab("Count") +
+  theme(plot.title = element_text(hjust = 0.5), axis.text.x = element_text(angle = 45, vjust = 0.5, hjust = 0.5)) +
+  geom_text(aes(label = Freq,), position = position_stack(vjust=0.5)) + 
+#  geom_text(aes(label = percent(round(Freq/nrow(myDf), 3))), position = position_stack(vjust=0.5)) +
+  scale_fill_brewer(palette = "Pastel1")
+```
+
+```{r}
+#Are people taking any prescription? insured vs uninsured
+myDf <- as.data.frame(table(angina_black$HIQ011, angina_black$RXDUSE_n)) %>% 
+  arrange(-Freq) %>% 
+  filter(Var1 %in% c(1,2)) %>% 
+  mutate(Var1 = case_when(
+    Var1 == 1 ~ "Insured",
+    Var1 == 2 ~ "Uninsured"
+  )) %>% 
+  mutate(Var2 = case_when(
+    Var2 == 1 ~ "Yes",
+    Var2 == 2 ~ "No"
+  )) 
+
+ggplot(myDf, aes(fill = Var2, y = Freq, x = reorder(Var2, -Freq))) +
+  geom_bar(stat = "identity", width = 0.5, colour = "black") +
+  scale_fill_viridis(discrete = T, option = "E") +
+  ggtitle(label = "Non-Hispanic Black Participants with Angina / Angina Pectoris") + 
+  facet_wrap(~Var1) + 
+  theme_minimal() +
+  theme(legend.position = "none",
+        plot.subtitle = element_text(hjust = 0.5)) + 
+  xlab("Currently Taking RX") +
+  ylab("Count") +
+  theme(plot.title = element_text(hjust = 0.5), axis.text.x = element_text(angle = 45, vjust = 0.5, hjust = 0.5)) +
+  geom_text(aes(label = Freq,), position = position_stack(vjust=0.5)) + 
+#  geom_text(aes(label = percent(round(Freq/nrow(myDf), 3))), position = position_stack(vjust=0.5)) +
+  scale_fill_brewer(palette = "Pastel1")
+```
+
+
+```{r}
+#Are people taking any prescription? insured vs uninsured
+myDf <- as.data.frame(table(heart_white$HIQ011, heart_white$RXDUSE_n)) %>% 
+  arrange(-Freq) %>% 
+  filter(Var1 %in% c(1,2)) %>% 
+  mutate(Var1 = case_when(
+    Var1 == 1 ~ "Insured",
+    Var1 == 2 ~ "Uninsured"
+  )) %>% 
+  mutate(Var2 = case_when(
+    Var2 == 1 ~ "Yes",
+    Var2 == 2 ~ "No"
+  )) 
+
+ggplot(myDf, aes(fill = Var2, y = Freq, x = reorder(Var2, -Freq))) +
+  geom_bar(stat = "identity", width = 0.5, colour = "black") +
+  scale_fill_viridis(discrete = T, option = "E") +
+  ggtitle(label = "Non-Hispanic White Participants Who Have had a Heart Attack") + 
+  facet_wrap(~Var1) + 
+  theme_minimal() +
+  theme(legend.position = "none",
+        plot.subtitle = element_text(hjust = 0.5)) + 
+  xlab("Currently Taking RX") +
+  ylab("Count") +
+  theme(plot.title = element_text(hjust = 0.5), axis.text.x = element_text(angle = 45, vjust = 0.5, hjust = 0.5)) +
+  geom_text(aes(label = Freq,), position = position_stack(vjust=0.5)) + 
+#  geom_text(aes(label = percent(round(Freq/nrow(myDf), 3))), position = position_stack(vjust=0.5)) +
+  scale_fill_brewer(palette = "Pastel1")
+```
+
+```{r}
+#Are people taking any prescription? insured vs uninsured
+myDf <- as.data.frame(table(heart_black$HIQ011, heart_black$RXDUSE_n)) %>% 
+  arrange(-Freq) %>% 
+  filter(Var1 %in% c(1,2)) %>% 
+  mutate(Var1 = case_when(
+    Var1 == 1 ~ "Insured",
+    Var1 == 2 ~ "Uninsured"
+  )) %>% 
+  mutate(Var2 = case_when(
+    Var2 == 1 ~ "Yes",
+    Var2 == 2 ~ "No"
+  )) 
+
+ggplot(myDf, aes(fill = Var2, y = Freq, x = reorder(Var2, -Freq))) +
+  geom_bar(stat = "identity", width = 0.5, colour = "black") +
+  scale_fill_viridis(discrete = T, option = "E") +
+  ggtitle(label = "Non-Hispanic Black Participants Who Have had a Heart Attack") + 
+  facet_wrap(~Var1) + 
+  theme_minimal() +
+  theme(legend.position = "none",
+        plot.subtitle = element_text(hjust = 0.5)) + 
+  xlab("Currently Taking RX") +
+  ylab("Count") +
+  theme(plot.title = element_text(hjust = 0.5), axis.text.x = element_text(angle = 45, vjust = 0.5, hjust = 0.5)) +
+  geom_text(aes(label = Freq,), position = position_stack(vjust=0.5)) + 
+#  geom_text(aes(label = percent(round(Freq/nrow(myDf), 3))), position = position_stack(vjust=0.5)) +
+  scale_fill_brewer(palette = "Pastel1")
+```
+
+```{r}
+#Are people taking any prescription? insured vs uninsured
+myDf <- as.data.frame(table(stroke_white$HIQ011, stroke_white$RXDUSE_n)) %>% 
+  arrange(-Freq) %>% 
+  filter(Var1 %in% c(1,2)) %>% 
+  mutate(Var1 = case_when(
+    Var1 == 1 ~ "Insured",
+    Var1 == 2 ~ "Uninsured"
+  )) %>% 
+  mutate(Var2 = case_when(
+    Var2 == 1 ~ "Yes",
+    Var2 == 2 ~ "No"
+  )) 
+
+ggplot(myDf, aes(fill = Var2, y = Freq, x = reorder(Var2, -Freq))) +
+  geom_bar(stat = "identity", width = 0.5, colour = "black") +
+  scale_fill_viridis(discrete = T, option = "E") +
+  ggtitle(label = "Non-Hispanic White Participants Who Have had a Stroke") + 
+  facet_wrap(~Var1) + 
+  theme_minimal() +
+  theme(legend.position = "none",
+        plot.subtitle = element_text(hjust = 0.5)) + 
+  xlab("Currently Taking RX") +
+  ylab("Count") +
+  theme(plot.title = element_text(hjust = 0.5), axis.text.x = element_text(angle = 45, vjust = 0.5, hjust = 0.5)) +
+  geom_text(aes(label = Freq,), position = position_stack(vjust=0.5)) + 
+#  geom_text(aes(label = percent(round(Freq/nrow(myDf), 3))), position = position_stack(vjust=0.5)) +
+  scale_fill_brewer(palette = "Pastel1")
+```
+
+```{r}
+#Are people taking any prescription? insured vs uninsured
+myDf <- as.data.frame(table(stroke_black$HIQ011, stroke_black$RXDUSE_n)) %>% 
+  arrange(-Freq) %>% 
+  filter(Var1 %in% c(1,2)) %>% 
+  mutate(Var1 = case_when(
+    Var1 == 1 ~ "Insured",
+    Var1 == 2 ~ "Uninsured"
+  )) %>% 
+  mutate(Var2 = case_when(
+    Var2 == 1 ~ "Yes",
+    Var2 == 2 ~ "No"
+  )) 
+
+ggplot(myDf, aes(fill = Var2, y = Freq, x = reorder(Var2, -Freq))) +
+  geom_bar(stat = "identity", width = 0.5, colour = "black") +
+  scale_fill_viridis(discrete = T, option = "E") +
+  ggtitle(label = "Non-Hispanic Black Participants Who Have had a Stroke") + 
+  facet_wrap(~Var1) + 
+  theme_minimal() +
+  theme(legend.position = "none",
+        plot.subtitle = element_text(hjust = 0.5)) + 
+  xlab("Currently Taking RX") +
+  ylab("Count") +
+  theme(plot.title = element_text(hjust = 0.5), axis.text.x = element_text(angle = 45, vjust = 0.5, hjust = 0.5)) +
+  geom_text(aes(label = Freq,), position = position_stack(vjust=0.5)) + 
+#  geom_text(aes(label = percent(round(Freq/nrow(myDf), 3))), position = position_stack(vjust=0.5)) +
+  scale_fill_brewer(palette = "Pastel1")
+```
+
+
+# Breakdown hypertension drug prevalence by year
+
+```{r}
+#Drug Prevalence by cycle, white
+myDf <- as.data.frame(table(df_white$cycle[df_white$RXDRSC1 == "I10"], df_white$hypertensive_rx[df_white$RXDRSC1 == "I10"])) %>% 
+  arrange(Var1, -Freq) %>% 
+  mutate(n = case_when(
+    Var1 == "2013-2014" ~ nrow(filter(df_white, RXDRSC1 == "I10", cycle == "2013-2014")),
+    Var1 == "2015-2016" ~ nrow(filter(df_white, RXDRSC1 == "I10", cycle == "2015-2016")),
+    Var1 == "2017-2018" ~ nrow(filter(df_white, RXDRSC1 == "I10", cycle == "2017-2018"))
+  )) %>% 
+  mutate(perc = percent(round(Freq / n, 3)))
+
+myDf %>% 
+  gt() %>% 
+  tab_header(title = md("Hypertensive Drug Prevalence by Cycle, Non-Hispanic White")) %>% 
+  cols_label(Var1 = "Cycle",
+             Var2 = "Drug Category")
+
+ggplot(myDf, aes(fill = Var2, y = Freq, x = reorder(Var2, -Freq))) +
+  geom_bar(stat = "identity", width = 0.5, colour = "black") +
+  scale_fill_viridis(discrete = T, option = "E") +
+  ggtitle("Hypertensive Drug Prevalence by Cycle, Non-Hispanic White") + 
+  facet_wrap(~Var1) + 
+  theme_minimal() +
+  theme(legend.position = "none") + 
+  xlab("") +
+  ylab("Count") +
+  theme(plot.title = element_text(hjust = 0.5), axis.text.x = element_text(angle = 45, vjust = 0.5, hjust = 0.5)) +
+  geom_text(aes(label = perc), size = 3, vjust = -0.2, hjust = 0.2) + 
+  #geom_text(aes(label = percent(round(Freq/nrow(myDf), 3))), position = position_stack(vjust=0.5)) +
+  scale_fill_brewer(palette = "Pastel1")
+```
+
+
+
+```{r}
+#Drug Prevalence by cycle, black
+myDf <- as.data.frame(table(df_black$cycle[df_black$RXDRSC1 == "I10"], df_black$hypertensive_rx[df_black$RXDRSC1 == "I10"])) %>% 
+  arrange(Var1, -Freq) %>% 
+  mutate(n = case_when(
+    Var1 == "2013-2014" ~ nrow(filter(df_black, RXDRSC1 == "I10", cycle == "2013-2014")),
+    Var1 == "2015-2016" ~ nrow(filter(df_black, RXDRSC1 == "I10", cycle == "2015-2016")),
+    Var1 == "2017-2018" ~ nrow(filter(df_black, RXDRSC1 == "I10", cycle == "2017-2018"))
+  )) %>% 
+  mutate(perc = percent(round(Freq / n, 3)))
+
+myDf %>% 
+  gt() %>% 
+  tab_header(title = md("Hypertensive Drug Prevalence by Cycle, Non-Hispanic Black")) %>% 
+  cols_label(Var1 = "Cycle",
+             Var2 = "Drug Category")
+
+ggplot(myDf, aes(fill = Var2, y = Freq, x = reorder(Var2, -Freq))) +
+  geom_bar(stat = "identity", width = 0.5, colour = "black") +
+  scale_fill_viridis(discrete = T, option = "E") +
+  ggtitle("Hypertensive Drug Prevalence by Cycle, Non-Hispanic Black") + 
+  facet_wrap(~Var1) + 
+  theme_minimal() +
+  theme(legend.position = "none") + 
+  xlab("") +
+  ylab("Count") +
+  theme(plot.title = element_text(hjust = 0.5), axis.text.x = element_text(angle = 45, vjust = 0.5, hjust = 0.5)) +
+  geom_text(aes(label = perc), size = 2.75, vjust = -0.2, hjust = 0.2) + 
+  #geom_text(aes(label = percent(round(Freq/nrow(myDf), 3))), position = position_stack(vjust=0.5)) +
+  scale_fill_brewer(palette = "Pastel1")
+```
